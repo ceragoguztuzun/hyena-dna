@@ -10,11 +10,11 @@ Usage:
     python run_single_benchmark.py --dataset human_enhancers_cohn
 
     # Run with custom settings
-    python run_single_benchmark.py --dataset human_enhancers_cohn \\
+    python run_single_benchmark.py --dataset human_enhancers_cohn \
         --epochs 10 --d_model 256 --n_layer 4 --batch_size 64
 
     # Run Nucleotide Transformer dataset
-    python run_single_benchmark.py --suite nucleotide_transformer \\
+    python run_single_benchmark.py --suite nucleotide_transformer \
         --dataset enhancer --epochs 10
 """
 
@@ -27,38 +27,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional
-
-# Dataset configurations
-GENOMIC_BENCHMARKS_DATASETS = {
-    "dummy_mouse_enhancers_ensembl": {"max_length": 2381, "classes": 2},
-    "demo_coding_vs_intergenomic_seqs": {"max_length": 200, "classes": 2},
-    "demo_human_or_worm": {"max_length": 200, "classes": 2},
-    "human_enhancers_cohn": {"max_length": 500, "classes": 2},
-    "human_enhancers_ensembl": {"max_length": 269, "classes": 2},
-    "human_ensembl_regulatory": {"max_length": 401, "classes": 3},
-    "human_nontata_promoters": {"max_length": 251, "classes": 2},
-    "human_ocr_ensembl": {"max_length": 315, "classes": 2}
-}
-
-NUCLEOTIDE_TRANSFORMER_DATASETS = {
-    "enhancer": {"max_length": 200, "classes": 2},
-    "enhancer_types": {"max_length": 200, "classes": 3},
-    "H3": {"max_length": 500, "classes": 2},
-    "H3K4me1": {"max_length": 500, "classes": 2},
-    "H3K4me2": {"max_length": 500, "classes": 2},
-    "H3K4me3": {"max_length": 500, "classes": 2},
-    "H3K9ac": {"max_length": 500, "classes": 2},
-    "H3K14ac": {"max_length": 500, "classes": 2},
-    "H3K36me3": {"max_length": 500, "classes": 2},
-    "H3K79me3": {"max_length": 500, "classes": 2},
-    "H4": {"max_length": 500, "classes": 2},
-    "H4ac": {"max_length": 500, "classes": 2},
-    "promoter_all": {"max_length": 300, "classes": 2},
-    "promoter_non_tata": {"max_length": 300, "classes": 2},
-    "promoter_tata": {"max_length": 300, "classes": 2},
-    "splice_sites_acceptor": {"max_length": 600, "classes": 2},
-    "splice_sites_donor": {"max_length": 600, "classes": 2}
-}
+import yaml
 
 class Colors:
     GREEN = '\033[92m'
@@ -85,6 +54,46 @@ def print_info(text: str):
 
 def print_warning(text: str):
     print(f"{Colors.YELLOW}⚠{Colors.END} {text}")
+
+
+def load_dataset_config(suite: str, dataset: str) -> Dict:
+    """
+    Load dataset configuration from YAML config files
+
+    This reads directly from the Hydra configs instead of duplicating the data.
+    Falls back to minimal defaults if config file not found.
+    """
+    config_map = {
+        "genomic_benchmark": "configs/dataset/genomic_benchmark.yaml",
+        "nucleotide_transformer": "configs/dataset/nucleotide_transformer.yaml"
+    }
+
+    config_file = Path(config_map.get(suite, ""))
+
+    if not config_file.exists():
+        # Fallback: return minimal config (let Hydra handle the rest)
+        print_warning(f"Config file not found: {config_file}. Using defaults.")
+        return {"max_length": 500, "classes": 2}
+
+    try:
+        with open(config_file, 'r') as f:
+            config = yaml.safe_load(f)
+
+        # Extract dataset-specific config
+        if dataset in config:
+            dataset_config = config[dataset]
+            return {
+                "max_length": config.get("max_length", 500),
+                "classes": dataset_config.get("classes", 2)
+            }
+        else:
+            # Dataset not in config, use defaults
+            return {"max_length": 500, "classes": 2}
+
+    except Exception as e:
+        print_warning(f"Failed to load config from {config_file}: {e}")
+        return {"max_length": 500, "classes": 2}
+
 
 def build_command(
     suite: str,
@@ -116,28 +125,25 @@ def build_command(
     Returns:
         List of command arguments
     """
-    # Get dataset info
+    # Load dataset config from YAML
+    dataset_config = load_dataset_config(suite, dataset)
+
+    # Determine experiment config
     if suite == "genomic_benchmark":
-        if dataset not in GENOMIC_BENCHMARKS_DATASETS:
-            raise ValueError(f"Unknown dataset: {dataset}")
-        dataset_info = GENOMIC_BENCHMARKS_DATASETS[dataset]
         experiment = "hg38/genomic_benchmark"
     else:  # nucleotide_transformer
-        if dataset not in NUCLEOTIDE_TRANSFORMER_DATASETS:
-            raise ValueError(f"Unknown dataset: {dataset}")
-        dataset_info = NUCLEOTIDE_TRANSFORMER_DATASETS[dataset]
         experiment = "hg38/nucleotide_transformer"
 
     # Auto-set max_length if not provided
     if max_length is None:
-        max_length = dataset_info["max_length"]
+        max_length = dataset_config["max_length"]
 
     # Build command
     cmd = [
         "python", "-m", "train",
         f"wandb=null",  # Disable wandb
         f"experiment={experiment}",
-        f"dataset.dataset_name={dataset}",  # Fixed: need dataset. prefix
+        f"dataset.dataset_name={dataset}",
         f"dataset.max_length={max_length}",
         f"model.d_model={d_model}",
         f"model.n_layer={n_layer}",
@@ -160,6 +166,7 @@ def build_command(
         cmd.append(f"hydra.run.dir={output_dir}")
 
     return cmd
+
 
 def parse_output_log(log_file: Path) -> Dict:
     """
@@ -241,6 +248,7 @@ def parse_output_log(log_file: Path) -> Dict:
 
     return results
 
+
 def run_benchmark(args: argparse.Namespace) -> Dict:
     """
     Run a single benchmark
@@ -299,30 +307,50 @@ def run_benchmark(args: argparse.Namespace) -> Dict:
     start_time = time.time()
 
     try:
-        with open(log_file, 'w') as f:
+        with open(log_file, 'wb') as log_f:
             process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
-                universal_newlines=True,
-                bufsize=1
+                bufsize=0  # Unbuffered for real-time output
             )
 
-            # Stream output to both console and log file
-            for line in process.stdout:
-                print(line, end='')
-                f.write(line)
-                f.flush()
+            # Handle output with proper tqdm support
+            # Read byte by byte to preserve carriage returns
+            current_line = bytearray()
+
+            for byte in iter(lambda: process.stdout.read(1), b''):
+                log_f.write(byte)  # Write to log file
+                log_f.flush()
+
+                current_line.extend(byte)
+
+                # If we hit a newline or carriage return, print the line
+                if byte == b'\n':
+                    # Print and reset
+                    sys.stdout.buffer.write(current_line)
+                    sys.stdout.buffer.flush()
+                    current_line.clear()
+                elif byte == b'\r':
+                    # Carriage return - overwrite current line (tqdm behavior)
+                    sys.stdout.buffer.write(current_line)
+                    sys.stdout.buffer.flush()
+                    current_line.clear()
+
+            # Print any remaining content
+            if current_line:
+                sys.stdout.buffer.write(current_line + b'\n')
+                sys.stdout.buffer.flush()
 
             process.wait()
 
         training_time = time.time() - start_time
 
         if process.returncode == 0:
-            print_success(f"Training completed successfully in {training_time:.2f}s")
+            print_success(f"\nTraining completed successfully in {training_time:.2f}s")
             status = "success"
         else:
-            print_error(f"Training failed with return code {process.returncode}")
+            print_error(f"\nTraining failed with return code {process.returncode}")
             status = "failed"
 
     except KeyboardInterrupt:
@@ -357,6 +385,7 @@ def run_benchmark(args: argparse.Namespace) -> Dict:
     print_info(f"Results saved to: {results_file}")
 
     return results
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -440,22 +469,6 @@ Examples:
 
     args = parser.parse_args()
 
-    # Validate dataset
-    if args.suite == "genomic_benchmark":
-        if args.dataset not in GENOMIC_BENCHMARKS_DATASETS:
-            print_error(f"Unknown GenomicBenchmarks dataset: {args.dataset}")
-            print_info("Available datasets:")
-            for name in GENOMIC_BENCHMARKS_DATASETS.keys():
-                print(f"  - {name}")
-            return 1
-    else:
-        if args.dataset not in NUCLEOTIDE_TRANSFORMER_DATASETS:
-            print_error(f"Unknown Nucleotide Transformer dataset: {args.dataset}")
-            print_info("Available datasets:")
-            for name in NUCLEOTIDE_TRANSFORMER_DATASETS.keys():
-                print(f"  - {name}")
-            return 1
-
     # Run benchmark
     results = run_benchmark(args)
 
@@ -471,6 +484,7 @@ Examples:
     print(f"Results saved to: {results.get('output_dir', 'unknown')}")
 
     return 0 if results['status'] in ['success', 'completed'] else 1
+
 
 if __name__ == "__main__":
     sys.exit(main())
