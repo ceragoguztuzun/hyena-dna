@@ -83,7 +83,7 @@ def load_dataset_config(suite: str, dataset: str) -> Dict:
         if dataset in config:
             dataset_config = config[dataset]
             return {
-                "max_length": config.get("max_length", 500),
+                "max_length": dataset_config.get("max_length", 500),
                 "classes": dataset_config.get("classes", 2)
             }
         else:
