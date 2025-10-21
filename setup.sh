@@ -64,7 +64,14 @@ fi
 
 # Install requirements from requirements.txt
 print_status "Installing package requirements..."
-pip install -r requirements.txt
+pip install -r requirements.txt || {
+    print_warning "Some packages failed to install. Trying without torchtext..."
+    # Remove torchtext line and try again
+    grep -v "torchtext" requirements.txt > requirements_temp.txt
+    pip install -r requirements_temp.txt
+    rm requirements_temp.txt
+    print_info "Continuing without torchtext (not needed for genomic benchmarks)"
+}
 
 # Install additional dependencies for benchmarks
 print_status "Installing benchmark-specific dependencies..."
