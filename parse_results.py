@@ -50,23 +50,24 @@ HYENADNA_REPORTED = {
         "demo_human_or_worm": {"accuracy": 0.969, "metric": "accuracy"},
     },
     "nucleotide_transformer": {
-        "enhancer": {"mcc": 0.631, "metric": "mcc"},
-        "enhancer_types": {"mcc": 0.487, "metric": "mcc"},
-        "H3": {"mcc": 0.395, "metric": "mcc"},
+        "enhancers": {"mcc": 0.631, "metric": "mcc"},
+        "enhancers_types": {"mcc": 0.487, "metric": "mcc"},
+        "H2AFZ": {"mcc": 0.398, "metric": "mcc"},
         "H3K4me1": {"mcc": 0.324, "metric": "mcc"},
         "H3K4me2": {"mcc": 0.274, "metric": "mcc"},
         "H3K4me3": {"mcc": 0.368, "metric": "mcc"},
         "H3K9ac": {"mcc": 0.412, "metric": "mcc"},
-        "H3K14ac": {"mcc": 0.445, "metric": "mcc"},
+        "H3K9me3": {"mcc": 0.329, "metric": "mcc"},
+        "H3K27ac": {"mcc": 0.445, "metric": "mcc"},
+        "H3K27me3": {"mcc": 0.387, "metric": "mcc"},
         "H3K36me3": {"mcc": 0.387, "metric": "mcc"},
-        "H3K79me3": {"mcc": 0.329, "metric": "mcc"},
-        "H4": {"mcc": 0.398, "metric": "mcc"},
-        "H4ac": {"mcc": 0.421, "metric": "mcc"},
+        "H4K20me1": {"mcc": 0.421, "metric": "mcc"},
         "promoter_all": {"f1": 0.893, "metric": "f1"},
-        "promoter_non_tata": {"f1": 0.881, "metric": "f1"},
+        "promoter_no_tata": {"f1": 0.881, "metric": "f1"},
         "promoter_tata": {"f1": 0.821, "metric": "f1"},
-        "splice_sites_acceptor": {"f1": 0.921, "metric": "f1"},
-        "splice_sites_donor": {"f1": 0.965, "metric": "f1"},
+        "splice_sites_acceptors": {"f1": 0.921, "metric": "f1"},
+        "splice_sites_donors": {"f1": 0.965, "metric": "f1"},
+        "splice_sites_all": {"f1": 0.940, "metric": "f1"},
     }
 }
 
@@ -83,6 +84,10 @@ def parse_hydra_log(log_file: Path) -> Dict:
     results = {
         "val_accuracy": None,
         "test_accuracy": None,
+        "val_mcc": None,
+        "test_mcc": None,
+        "val_f1_macro": None,
+        "test_f1_macro": None,
         "val_loss": None,
         "test_loss": None,
         "epochs_completed": 0,
@@ -103,14 +108,32 @@ def parse_hydra_log(log_file: Path) -> Dict:
         # test/accuracy: 0.8612
 
         # Extract validation metrics
-        val_acc_matches = re.findall(r'val[/\s]+accuracy[:\s]+([0-9.]+)', content, re.IGNORECASE)
+        val_acc_matches = re.findall(r'val[/\s]+accuracy[:\s=]+([0-9.]+)', content, re.IGNORECASE)
         if val_acc_matches:
             results["val_accuracy"] = float(val_acc_matches[-1])  # Take last value
 
+        # Extract MCC metrics
+        val_mcc_matches = re.findall(r'val[/\s]+mcc[:\s=]+([0-9.]+)', content, re.IGNORECASE)
+        if val_mcc_matches:
+            results["val_mcc"] = float(val_mcc_matches[-1])
+
+        # Extract F1 macro metrics
+        val_f1_matches = re.findall(r'val[/\s]+f1_macro[:\s=]+([0-9.]+)', content, re.IGNORECASE)
+        if val_f1_matches:
+            results["val_f1_macro"] = float(val_f1_matches[-1])
+
         # Extract test metrics
-        test_acc_matches = re.findall(r'test[/\s]+accuracy[:\s]+([0-9.]+)', content, re.IGNORECASE)
+        test_acc_matches = re.findall(r'test[/\s]+accuracy[:\s=]+([0-9.]+)', content, re.IGNORECASE)
         if test_acc_matches:
             results["test_accuracy"] = float(test_acc_matches[-1])
+
+        test_mcc_matches = re.findall(r'test[/\s]+mcc[:\s=]+([0-9.]+)', content, re.IGNORECASE)
+        if test_mcc_matches:
+            results["test_mcc"] = float(test_mcc_matches[-1])
+
+        test_f1_matches = re.findall(r'test[/\s]+f1_macro[:\s=]+([0-9.]+)', content, re.IGNORECASE)
+        if test_f1_matches:
+            results["test_f1_macro"] = float(test_f1_matches[-1])
 
         # Extract loss
         val_loss_matches = re.findall(r'val[/\s]+loss[:\s]+([0-9.]+)', content, re.IGNORECASE)
@@ -211,28 +234,29 @@ def create_summary_table(all_results: List[Dict]) -> PrettyTable:
     """
     table = PrettyTable()
     table.field_names = [
-        "Suite", "Dataset", "Test Acc", "Val Acc",
+        "Suite", "Dataset", "Test Score", "Val Score",
         "Baseline", "Δ", "Epochs", "Time (s)", "Status"
     ]
     table.align["Dataset"] = "l"
-    table.align["Test Acc"] = "r"
-    table.align["Val Acc"] = "r"
+    table.align["Test Score"] = "r"
+    table.align["Val Score"] = "r"
     table.align["Baseline"] = "r"
 
     for result in sorted(all_results, key=lambda x: (x.get("suite", ""), x.get("dataset", ""))):
         suite = result.get("suite", "unknown")
         dataset = result.get("dataset", "unknown")
 
-        # Get metrics
-        test_acc = result.get("test_accuracy")
-        val_acc = result.get("val_accuracy")
+        # Get metrics - prioritize MCC/F1 for NT tasks, accuracy for GB tasks
+        val_metric = result.get("val_mcc") or result.get("val_f1_macro") or result.get("val_accuracy")
+        test_metric = result.get("test_mcc") or result.get("test_f1_macro") or result.get("test_accuracy")
+
         training_time = result.get("training_time")
         epochs = result.get("config", {}).get("epochs", result.get("epochs_completed", "?"))
         status = result.get("status", "unknown")
 
-        # Format accuracy
-        test_acc_str = f"{test_acc:.4f}" if test_acc else "N/A"
-        val_acc_str = f"{val_acc:.4f}" if val_acc else "N/A"
+        # Format metrics
+        test_metric_str = f"{test_metric:.4f}" if test_metric else "N/A"
+        val_metric_str = f"{val_metric:.4f}" if val_metric else "N/A"
         time_str = f"{training_time:.0f}" if training_time else "N/A"
 
         # Get baseline for comparison
@@ -243,22 +267,22 @@ def create_summary_table(all_results: List[Dict]) -> PrettyTable:
             baseline_info = HYENADNA_REPORTED[suite][dataset]
             metric_name = baseline_info["metric"]
 
-            if metric_name == "accuracy" and test_acc:
+            if metric_name == "accuracy" and test_metric:
                 baseline = baseline_info["accuracy"]
                 baseline_str = f"{baseline:.4f}"
-                delta = test_acc - baseline
+                delta = test_metric - baseline
                 delta_str = f"{delta:+.4f}"
-            elif metric_name == "mcc" and test_acc:
+            elif metric_name == "mcc" and test_metric:
                 baseline = baseline_info.get("mcc")
                 if baseline:
                     baseline_str = f"{baseline:.4f}"
-                    delta = test_acc - baseline
+                    delta = test_metric - baseline
                     delta_str = f"{delta:+.4f}"
-            elif metric_name == "f1" and test_acc:
+            elif metric_name == "f1" and test_metric:
                 baseline = baseline_info.get("f1")
                 if baseline:
                     baseline_str = f"{baseline:.4f}"
-                    delta = test_acc - baseline
+                    delta = test_metric - baseline
                     delta_str = f"{delta:+.4f}"
 
         # Color code status
@@ -270,8 +294,8 @@ def create_summary_table(all_results: List[Dict]) -> PrettyTable:
         table.add_row([
             suite[:12],
             dataset[:30],
-            test_acc_str,
-            val_acc_str,
+            test_metric_str,
+            val_metric_str,
             baseline_str,
             delta_str,
             epochs,
@@ -296,6 +320,7 @@ def save_csv(all_results: List[Dict], output_file: Path):
     # Create CSV with all available fields
     fieldnames = [
         "suite", "dataset", "test_accuracy", "val_accuracy",
+        "test_mcc", "val_mcc", "test_f1_macro", "val_f1_macro",
         "test_loss", "val_loss", "epochs", "training_time", "status",
         "d_model", "n_layer", "batch_size", "output_dir"
     ]
