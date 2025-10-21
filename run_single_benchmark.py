@@ -190,44 +190,45 @@ def parse_output_log(log_file: Path) -> Dict:
             log_content = f.read()
 
         # PyTorch Lightning progress bar format
-        # Look for patterns like: val/accuracy=0.8523
-        # or 'val/accuracy': 0.8523
-
-        # Try different patterns
-        patterns = [
-            r"val/accuracy[=:\s]+([0-9.]+)",
-            r"'val/accuracy'[:\s]+([0-9.]+)",
-            r"test/accuracy[=:\s]+([0-9.]+)",
-            r"'test/accuracy'[:\s]+([0-9.]+)",
-            r"val/loss[=:\s]+([0-9.]+)",
-            r"'val/loss'[:\s]+([0-9.]+)",
-            r"test/loss[=:\s]+([0-9.]+)",
-            r"'test/loss'[:\s]+([0-9.]+)",
-        ]
+        # Look for patterns like: val/accuracy=0.709 or 'val/accuracy' reached 0.70912
 
         import re
 
-        # Extract validation accuracy
-        val_acc_matches = re.findall(patterns[0], log_content) or re.findall(patterns[1], log_content)
-        if val_acc_matches:
-            results["val_accuracy"] = float(val_acc_matches[-1])  # Take last value
-            results["accuracy"] = results["val_accuracy"]  # Use val as default
+        # Try different patterns for each metric
+        patterns = {
+            "val_accuracy": [
+                r"val/accuracy=([0-9.]+)",  # Progress bar format
+                r"'val/accuracy'\s+reached\s+([0-9.]+)",  # Checkpoint save format
+                r"val/accuracy[:\s]+([0-9.]+)",
+            ],
+            "test_accuracy": [
+                r"test/accuracy=([0-9.]+)",
+                r"'test/accuracy'\s+reached\s+([0-9.]+)",
+                r"test/accuracy[:\s]+([0-9.]+)",
+            ],
+            "val_loss": [
+                r"val/loss=([0-9.]+)",
+                r"val/loss[:\s]+([0-9.]+)",
+            ],
+            "test_loss": [
+                r"test/loss=([0-9.]+)",
+                r"test/loss[:\s]+([0-9.]+)",
+            ],
+        }
 
-        # Extract test accuracy
-        test_acc_matches = re.findall(patterns[2], log_content) or re.findall(patterns[3], log_content)
-        if test_acc_matches:
-            results["test_accuracy"] = float(test_acc_matches[-1])
-            results["accuracy"] = results["test_accuracy"]  # Test overrides val
+        # Extract metrics
+        for metric, pattern_list in patterns.items():
+            for pattern in pattern_list:
+                matches = re.findall(pattern, log_content)
+                if matches:
+                    results[metric] = float(matches[-1])  # Take last value
+                    break
 
-        # Extract validation loss
-        val_loss_matches = re.findall(patterns[4], log_content) or re.findall(patterns[5], log_content)
-        if val_loss_matches:
-            results["val_loss"] = float(val_loss_matches[-1])
-
-        # Extract test loss
-        test_loss_matches = re.findall(patterns[6], log_content) or re.findall(patterns[7], log_content)
-        if test_loss_matches:
-            results["test_loss"] = float(test_loss_matches[-1])
+        # Set primary accuracy (prefer test, fall back to val)
+        if results["test_accuracy"]:
+            results["accuracy"] = results["test_accuracy"]
+        elif results["val_accuracy"]:
+            results["accuracy"] = results["val_accuracy"]
 
         # Mark as completed if we found any metrics
         if results["val_accuracy"] or results["test_accuracy"]:

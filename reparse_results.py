@@ -36,20 +36,22 @@ def parse_log_file(log_file: Path) -> dict:
     # Try different patterns for PyTorch Lightning output
     patterns = {
         "val_accuracy": [
-            r"val/accuracy[=:\s]+([0-9.]+)",
-            r"'val/accuracy'[:\s]+([0-9.]+)",
+            r"val/accuracy=([0-9.]+)",  # Progress bar format: val/accuracy=0.709
+            r"'val/accuracy'\s+reached\s+([0-9.]+)",  # Checkpoint save format
+            r"val/accuracy[:\s]+([0-9.]+)",
         ],
         "test_accuracy": [
-            r"test/accuracy[=:\s]+([0-9.]+)",
-            r"'test/accuracy'[:\s]+([0-9.]+)",
+            r"test/accuracy=([0-9.]+)",
+            r"'test/accuracy'\s+reached\s+([0-9.]+)",
+            r"test/accuracy[:\s]+([0-9.]+)",
         ],
         "val_loss": [
-            r"val/loss[=:\s]+([0-9.]+)",
-            r"'val/loss'[:\s]+([0-9.]+)",
+            r"val/loss=([0-9.]+)",
+            r"val/loss[:\s]+([0-9.]+)",
         ],
         "test_loss": [
-            r"test/loss[=:\s]+([0-9.]+)",
-            r"'test/loss'[:\s]+([0-9.]+)",
+            r"test/loss=([0-9.]+)",
+            r"test/loss[:\s]+([0-9.]+)",
         ],
     }
 
