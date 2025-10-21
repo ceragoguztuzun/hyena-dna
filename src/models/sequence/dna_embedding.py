@@ -2,8 +2,22 @@ from functools import partial
 import torch
 import torch.nn as nn
 
-from flash_attn.utils.generation import GenerationMixin
-from flash_attn.utils.distributed import sync_shared_params
+# Make flash_attn optional - it's an optimization, not required
+try:
+    from flash_attn.utils.generation import GenerationMixin
+    from flash_attn.utils.distributed import sync_shared_params
+    FLASH_ATTN_AVAILABLE = True
+except ImportError:
+    # Fallback: create dummy classes when flash_attn is not available
+    class GenerationMixin:
+        """Dummy GenerationMixin when flash_attn is not available"""
+        pass
+
+    def sync_shared_params(*args, **kwargs):
+        """Dummy sync_shared_params when flash_attn is not available"""
+        pass
+
+    FLASH_ATTN_AVAILABLE = False
 
 try:
     from flash_attn.ops.fused_dense import ColumnParallelLinear

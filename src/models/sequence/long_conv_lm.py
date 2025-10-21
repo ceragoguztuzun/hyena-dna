@@ -15,12 +15,54 @@ from transformers.models.gpt2.configuration_gpt2 import GPT2Config
 
 from einops import rearrange
 
-from flash_attn.modules.mha import MHA, ParallelMHA
-from flash_attn.modules.mlp import Mlp, FusedMLP, ParallelFusedMLP
-from flash_attn.modules.block import Block
-from flash_attn.modules.embedding import GPT2Embeddings, ParallelGPT2Embeddings
-from flash_attn.utils.generation import GenerationMixin
-from flash_attn.utils.distributed import sync_shared_params, all_gather_raw
+# Make flash_attn optional - it's an optimization, not required
+try:
+    from flash_attn.modules.mha import MHA, ParallelMHA
+    from flash_attn.modules.mlp import Mlp, FusedMLP, ParallelFusedMLP
+    from flash_attn.modules.block import Block
+    from flash_attn.modules.embedding import GPT2Embeddings, ParallelGPT2Embeddings
+    from flash_attn.utils.generation import GenerationMixin
+    from flash_attn.utils.distributed import sync_shared_params, all_gather_raw
+    FLASH_ATTN_AVAILABLE = True
+except ImportError:
+    # Fallback: create dummy classes when flash_attn is not available
+    class GenerationMixin:
+        """Dummy GenerationMixin when flash_attn is not available"""
+        pass
+
+    def sync_shared_params(*args, **kwargs):
+        """Dummy sync_shared_params when flash_attn is not available"""
+        pass
+
+    def all_gather_raw(*args, **kwargs):
+        """Dummy all_gather_raw when flash_attn is not available"""
+        pass
+
+    # Create fallback classes for flash_attn components
+    MHA = None
+    ParallelMHA = None
+    Mlp = None
+    FusedMLP = None
+    ParallelFusedMLP = None
+    Block = None
+
+    # Minimal GPT2Embeddings fallback
+    class GPT2Embeddings(nn.Module):
+        def __init__(self, embed_dim, vocab_size, max_position_embeddings, **kwargs):
+            super().__init__()
+            self.word_embeddings = nn.Embedding(vocab_size, embed_dim)
+            self.max_position_embeddings = max_position_embeddings
+            if max_position_embeddings > 0:
+                self.position_embeddings = nn.Embedding(max_position_embeddings, embed_dim)
+
+        def forward(self, input_ids, position_ids=None):
+            embeddings = self.word_embeddings(input_ids)
+            if self.max_position_embeddings > 0 and position_ids is not None:
+                embeddings = embeddings + self.position_embeddings(position_ids)
+            return embeddings
+
+    ParallelGPT2Embeddings = GPT2Embeddings  # Use same fallback
+    FLASH_ATTN_AVAILABLE = False
 
 try:
     from flash_attn.ops.fused_dense import ColumnParallelLinear
