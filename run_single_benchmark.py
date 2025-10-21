@@ -145,6 +145,7 @@ def build_command(
         f"trainer.max_epochs={epochs}",
         f"trainer.devices=1",
         f"model.layer.l_max={max_length + 2}",  # l_max needs +2 for special tokens
+        f"train.pretrained_model_path=null",  # Disable pretrained model by default
     ]
 
     # Add pretrained model if specified
