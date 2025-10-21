@@ -1,0 +1,19 @@
+{
+  "accuracy": 0.906,
+  "val_accuracy": 0.906,
+  "test_accuracy": null,
+  "val_loss": 0.236,
+  "test_loss": null,
+  "training_time": 81.79643893241882,
+  "status": "success",
+  "dataset": "demo_coding_vs_intergenomic_seqs",
+  "suite": "genomic_benchmark",
+  "config": {
+    "epochs": 5,
+    "d_model": 128,
+    "n_layer": 2,
+    "batch_size": 128
+  },
+  "output_dir": "results/genomic_benchmark_demo_coding_vs_intergenomic_seqs_20251020_212543",
+  "log_file": "results/genomic_benchmark_demo_coding_vs_intergenomic_seqs_20251020_212543/training.log"
+}

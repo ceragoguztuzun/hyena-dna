@@ -1,0 +1,19 @@
+{
+  "accuracy": 0.817,
+  "val_accuracy": 0.817,
+  "test_accuracy": null,
+  "val_loss": 0.416,
+  "test_loss": null,
+  "training_time": 595.6852445602417,
+  "status": "success",
+  "dataset": "human_ensembl_regulatory",
+  "suite": "genomic_benchmark",
+  "config": {
+    "epochs": 5,
+    "d_model": 128,
+    "n_layer": 2,
+    "batch_size": 128
+  },
+  "output_dir": "results/genomic_benchmark_human_ensembl_regulatory_20251020_211228",
+  "log_file": "results/genomic_benchmark_human_ensembl_regulatory_20251020_211228/training.log"
+}

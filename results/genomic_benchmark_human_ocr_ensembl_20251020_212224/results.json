@@ -1,0 +1,19 @@
+{
+  "accuracy": 0.73,
+  "val_accuracy": 0.73,
+  "test_accuracy": null,
+  "val_loss": 0.531,
+  "test_loss": null,
+  "training_time": 180.40897011756897,
+  "status": "success",
+  "dataset": "human_ocr_ensembl",
+  "suite": "genomic_benchmark",
+  "config": {
+    "epochs": 5,
+    "d_model": 128,
+    "n_layer": 2,
+    "batch_size": 128
+  },
+  "output_dir": "results/genomic_benchmark_human_ocr_ensembl_20251020_212224",
+  "log_file": "results/genomic_benchmark_human_ocr_ensembl_20251020_212224/training.log"
+}

@@ -1,0 +1,11 @@
+- wandb=null
+- experiment=hg38/genomic_benchmark
+- dataset.dataset_name=human_enhancers_cohn
+- dataset.max_length=500
+- model.d_model=128
+- model.n_layer=2
+- dataset.batch_size=128
+- trainer.max_epochs=5
+- trainer.devices=1
+- model.layer.l_max=502
+- train.pretrained_model_path=null

@@ -1,0 +1,10 @@
+suite,dataset,test_accuracy,val_accuracy,test_loss,val_loss,epochs,training_time,status,d_model,n_layer,batch_size,output_dir
+genomic_benchmark,demo_coding_vs_intergenomic_seqs,,0.906,,0.236,5,81.79643893241882,success,128,2,128,results/genomic_benchmark_demo_coding_vs_intergenomic_seqs_20251020_212543
+genomic_benchmark,demo_human_or_worm,,0.959,,0.105,5,81.83610820770264,success,128,2,128,results/genomic_benchmark_demo_human_or_worm_20251020_212705
+genomic_benchmark,dummy_mouse_enhancers_ensembl,,0.715,,0.523,5,18.41601800918579,success,128,2,128,results/genomic_benchmark_dummy_mouse_enhancers_ensembl_20251020_212525
+genomic_benchmark,human_enhancers_cohn,,0.709,,0.555,5,45.615745067596436,success,128,2,128,results/genomic_benchmark_human_enhancers_cohn_20251020_205809
+genomic_benchmark,human_enhancers_cohn,,0.709,,0.555,5,45.696598052978516,success,128,2,128,results/genomic_benchmark_human_enhancers_cohn_20251020_210830
+genomic_benchmark,human_enhancers_ensembl,,0.802,,0.431,5,153.18429565429688,success,128,2,128,results/genomic_benchmark_human_enhancers_ensembl_20251020_210955
+genomic_benchmark,human_ensembl_regulatory,,0.817,,0.416,5,595.6852445602417,success,128,2,128,results/genomic_benchmark_human_ensembl_regulatory_20251020_211228
+genomic_benchmark,human_nontata_promoters,,0.854,,0.343,5,39.62888813018799,success,128,2,128,results/genomic_benchmark_human_nontata_promoters_20251020_210915
+genomic_benchmark,human_ocr_ensembl,,0.73,,0.531,5,180.40897011756897,success,128,2,128,results/genomic_benchmark_human_ocr_ensembl_20251020_212224

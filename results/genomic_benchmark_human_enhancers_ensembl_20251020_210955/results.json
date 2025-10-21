@@ -1,0 +1,19 @@
+{
+  "accuracy": 0.802,
+  "val_accuracy": 0.802,
+  "test_accuracy": null,
+  "val_loss": 0.431,
+  "test_loss": null,
+  "training_time": 153.18429565429688,
+  "status": "success",
+  "dataset": "human_enhancers_ensembl",
+  "suite": "genomic_benchmark",
+  "config": {
+    "epochs": 5,
+    "d_model": 128,
+    "n_layer": 2,
+    "batch_size": 128
+  },
+  "output_dir": "results/genomic_benchmark_human_enhancers_ensembl_20251020_210955",
+  "log_file": "results/genomic_benchmark_human_enhancers_ensembl_20251020_210955/training.log"
+}

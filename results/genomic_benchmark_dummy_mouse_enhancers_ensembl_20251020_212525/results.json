@@ -1,0 +1,19 @@
+{
+  "accuracy": 0.715,
+  "val_accuracy": 0.715,
+  "test_accuracy": null,
+  "val_loss": 0.523,
+  "test_loss": null,
+  "training_time": 18.41601800918579,
+  "status": "success",
+  "dataset": "dummy_mouse_enhancers_ensembl",
+  "suite": "genomic_benchmark",
+  "config": {
+    "epochs": 5,
+    "d_model": 128,
+    "n_layer": 2,
+    "batch_size": 128
+  },
+  "output_dir": "results/genomic_benchmark_dummy_mouse_enhancers_ensembl_20251020_212525",
+  "log_file": "results/genomic_benchmark_dummy_mouse_enhancers_ensembl_20251020_212525/training.log"
+}
