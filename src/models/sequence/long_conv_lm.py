@@ -41,10 +41,77 @@ except ImportError:
     # Create fallback classes for flash_attn components
     MHA = None
     ParallelMHA = None
-    Mlp = None
+
+    # Minimal Mlp fallback
+    class Mlp(nn.Module):
+        def __init__(self, in_features, hidden_features=None, out_features=None,
+                     activation=F.gelu, bias=True, **kwargs):
+            super().__init__()
+            out_features = out_features or in_features
+            hidden_features = hidden_features or in_features
+            self.fc1 = nn.Linear(in_features, hidden_features, bias=bias)
+            self.activation = activation
+            self.fc2 = nn.Linear(hidden_features, out_features, bias=bias)
+
+        def forward(self, x):
+            x = self.fc1(x)
+            x = self.activation(x)
+            x = self.fc2(x)
+            return x
+
     FusedMLP = None
     ParallelFusedMLP = None
-    Block = None
+
+    # Minimal Block fallback
+    class Block(nn.Module):
+        def __init__(self, dim, mixer_cls, mlp_cls, norm_cls=nn.LayerNorm,
+                     prenorm=True, resid_dropout1=0., resid_dropout2=0.,
+                     fused_dropout_add_ln=False, residual_in_fp32=False,
+                     sequence_parallel=False, mark_shared_params=False):
+            super().__init__()
+            self.prenorm = prenorm
+            self.fused_dropout_add_ln = fused_dropout_add_ln
+            self.residual_in_fp32 = residual_in_fp32
+
+            self.mixer = mixer_cls(dim)
+            self.dropout1 = nn.Dropout(resid_dropout1)
+            self.norm1 = norm_cls(dim)
+            self.mlp = mlp_cls(dim)
+            self.dropout2 = nn.Dropout(resid_dropout2)
+            self.norm2 = norm_cls(dim)
+
+        def forward(self, hidden_states, residual=None, mixer_kwargs=None):
+            if mixer_kwargs is None:
+                mixer_kwargs = {}
+
+            if self.prenorm:
+                # Prenorm: Norm -> Mixer -> Dropout -> Add
+                if residual is None:
+                    residual = hidden_states
+                else:
+                    residual = residual + self.dropout1(hidden_states)
+
+                hidden_states = self.norm1(residual)
+                hidden_states = self.mixer(hidden_states, **mixer_kwargs)
+                hidden_states = self.dropout1(hidden_states)
+
+                # MLP block
+                residual = residual + hidden_states
+                hidden_states = self.norm2(residual)
+                hidden_states = self.mlp(hidden_states)
+                hidden_states = self.dropout2(hidden_states)
+
+                return hidden_states, residual
+            else:
+                # Postnorm: Mixer -> Add -> Norm
+                if residual is None:
+                    residual = hidden_states
+                hidden_states = self.mixer(hidden_states, **mixer_kwargs)
+                hidden_states = self.norm1(residual + self.dropout1(hidden_states))
+                residual = hidden_states
+                hidden_states = self.mlp(hidden_states)
+                hidden_states = self.norm2(residual + self.dropout2(hidden_states))
+                return hidden_states, hidden_states
 
     # Minimal GPT2Embeddings fallback
     class GPT2Embeddings(nn.Module):
@@ -164,7 +231,16 @@ def create_mlp_cls(
             **factory_kwargs,
         )
     elif fused_mlp:
-        mlp_cls = FusedMLP if process_group is None else ParallelFusedMLP
+        # Check if FusedMLP is available
+        if process_group is None:
+            if FusedMLP is None:
+                print("Warning: FusedMLP not available (flash_attn not installed). Using standard Mlp instead.")
+                mlp_cls = Mlp
+            else:
+                mlp_cls = FusedMLP
+        else:
+            mlp_cls = ParallelFusedMLP
+
         parallel_kwargs = (
             {"process_group": process_group, "sequence_parallel": sequence_parallel}
             if process_group is not None
@@ -342,9 +418,12 @@ class LMBackbone(nn.Module):
         # the main branch (output of MLP). The model definition is unchanged, but the mapping of the
         # nn.Dropout probabilities are changed.
         # This is for performance reason: we can fuse dropout + add + layer_norm.
-        self.fused_dropout_add_ln = fused_dropout_add_ln
-        if self.fused_dropout_add_ln and dropout_add_layer_norm is None:
-            raise ImportError("dropout_add_layer_norm is not installed")
+        # If flash_attn is not available, disable fused operations
+        if fused_dropout_add_ln and dropout_add_layer_norm is None:
+            print("Warning: dropout_add_layer_norm not available (flash_attn not installed). Disabling fused_dropout_add_ln.")
+            self.fused_dropout_add_ln = False
+        else:
+            self.fused_dropout_add_ln = fused_dropout_add_ln
 
         self.layers = nn.ModuleList(
             [
