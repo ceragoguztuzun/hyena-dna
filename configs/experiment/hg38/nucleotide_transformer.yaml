@@ -43,7 +43,7 @@ task:
   _name_: masked_multiclass
   loss: cross_entropy
   metrics:
-    - accuracy
+    - ${dataset.metric}
   torchmetrics: null
 
 dataset:
