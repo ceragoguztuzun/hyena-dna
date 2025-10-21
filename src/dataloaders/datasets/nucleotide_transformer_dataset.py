@@ -94,9 +94,6 @@ class NucleotideTransformerDataset(torch.utils.data.Dataset):
         seq_ids = seq["input_ids"]  # get input_ids
         seq_ids = torch.LongTensor(seq_ids)
 
-        # convert to tensor
-        seq = torch.LongTensor(seq)  # hack, remove the initial cls tokens for now
-
         # need to wrap in list
         target = torch.LongTensor([y])  # offset by 1, includes eos
 
