@@ -169,23 +169,24 @@ GENOMIC_DATASETS=(
 
 # Nucleotide Transformer datasets
 NUCLEOTIDE_DATASETS=(
-    "enhancer"
-    "enhancer_types"
-    "H3"
+    "enhancers"
+    "enhancers_types"
+    "H2AFZ"
     "H3K4me1"
     "H3K4me2"
     "H3K4me3"
     "H3K9ac"
-    "H3K14ac"
+    "H3K9me3"
+    "H3K27ac"
+    "H3K27me3"
     "H3K36me3"
-    "H3K79me3"
-    "H4"
-    "H4ac"
+    "H4K20me1"
     "promoter_all"
-    "promoter_non_tata"
+    "promoter_no_tata"
     "promoter_tata"
-    "splice_sites_acceptor"
-    "splice_sites_donor"
+    "splice_sites_acceptors"
+    "splice_sites_all"
+    "splice_sites_donors"
 )
 
 # Track results
