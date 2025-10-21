@@ -175,7 +175,8 @@ def parse_output_log(log_file: Path) -> Dict:
         "accuracy": None,
         "val_accuracy": None,
         "test_accuracy": None,
-        "loss": None,
+        "val_loss": None,
+        "test_loss": None,
         "training_time": None,
         "status": "unknown"
     }
@@ -188,26 +189,51 @@ def parse_output_log(log_file: Path) -> Dict:
         with open(log_file, 'r') as f:
             log_content = f.read()
 
-        # Look for final test metrics
-        # This is a simple parser - you may need to adjust based on actual output format
-        lines = log_content.split('\n')
-        for line in lines:
-            if 'test/accuracy' in line.lower() or 'val/accuracy' in line.lower():
-                # Try to extract accuracy value
-                # Format might be: "val/accuracy: 0.8523" or similar
-                try:
-                    parts = line.split(':')
-                    if len(parts) > 1:
-                        acc_str = parts[-1].strip().split()[0]
-                        acc = float(acc_str)
-                        if 'test' in line.lower():
-                            results["test_accuracy"] = acc
-                        else:
-                            results["val_accuracy"] = acc
-                except:
-                    pass
+        # PyTorch Lightning progress bar format
+        # Look for patterns like: val/accuracy=0.8523
+        # or 'val/accuracy': 0.8523
 
-        results["status"] = "completed"
+        # Try different patterns
+        patterns = [
+            r"val/accuracy[=:\s]+([0-9.]+)",
+            r"'val/accuracy'[:\s]+([0-9.]+)",
+            r"test/accuracy[=:\s]+([0-9.]+)",
+            r"'test/accuracy'[:\s]+([0-9.]+)",
+            r"val/loss[=:\s]+([0-9.]+)",
+            r"'val/loss'[:\s]+([0-9.]+)",
+            r"test/loss[=:\s]+([0-9.]+)",
+            r"'test/loss'[:\s]+([0-9.]+)",
+        ]
+
+        import re
+
+        # Extract validation accuracy
+        val_acc_matches = re.findall(patterns[0], log_content) or re.findall(patterns[1], log_content)
+        if val_acc_matches:
+            results["val_accuracy"] = float(val_acc_matches[-1])  # Take last value
+            results["accuracy"] = results["val_accuracy"]  # Use val as default
+
+        # Extract test accuracy
+        test_acc_matches = re.findall(patterns[2], log_content) or re.findall(patterns[3], log_content)
+        if test_acc_matches:
+            results["test_accuracy"] = float(test_acc_matches[-1])
+            results["accuracy"] = results["test_accuracy"]  # Test overrides val
+
+        # Extract validation loss
+        val_loss_matches = re.findall(patterns[4], log_content) or re.findall(patterns[5], log_content)
+        if val_loss_matches:
+            results["val_loss"] = float(val_loss_matches[-1])
+
+        # Extract test loss
+        test_loss_matches = re.findall(patterns[6], log_content) or re.findall(patterns[7], log_content)
+        if test_loss_matches:
+            results["test_loss"] = float(test_loss_matches[-1])
+
+        # Mark as completed if we found any metrics
+        if results["val_accuracy"] or results["test_accuracy"]:
+            results["status"] = "completed"
+        else:
+            results["status"] = "no_metrics_found"
 
     except Exception as e:
         results["status"] = f"parse_error: {e}"
