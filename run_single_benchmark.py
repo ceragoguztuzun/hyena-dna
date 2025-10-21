@@ -137,7 +137,7 @@ def build_command(
         "python", "-m", "train",
         f"wandb=null",  # Disable wandb
         f"experiment={experiment}",
-        f"dataset_name={dataset}",
+        f"dataset.dataset_name={dataset}",  # Fixed: need dataset. prefix
         f"dataset.max_length={max_length}",
         f"model.d_model={d_model}",
         f"model.n_layer={n_layer}",
